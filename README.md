@@ -1,65 +1,60 @@
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+# Weather MCP Server (Laravel)
 
-## About Laravel
+A small learning/testing project for exploring the [Model Context Protocol](https://modelcontextprotocol.io) (MCP) using the [`laravel/mcp`](https://github.com/laravel/mcp) package. It exposes a **Weather MCP server** with a single `get-weather` tool, plus a browser-based console for connecting to the server and calling the tool by hand.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+This repo exists purely to learn how Laravel MCP servers, tools, and the Streamable HTTP transport work — it is not a production service.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## What's in here
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **`WeatherServer`** ([app/Mcp/Servers/WeatherServer.php](app/Mcp/Servers/WeatherServer.php)) — an MCP server registered at `/mcp/weather` that exposes the `get-weather` tool and instructs the LLM on when to use it.
+- **`GetWeather`** ([app/Mcp/Tools/GetWeather.php](app/Mcp/Tools/GetWeather.php)) — a read-only, open-world MCP tool that:
+  - Accepts a `location` (required) and `units` (`metric` or `imperial`, defaults to metric).
+  - Geocodes the location via the [Open-Meteo Geocoding API](https://open-meteo.com/).
+  - Fetches live current conditions from the [Open-Meteo Forecast API](https://open-meteo.com/).
+  - Returns structured content (temperature, apparent temperature, humidity, wind, condition, timezone, etc.) or a friendly error if the location can't be found or the provider is unreachable.
+- **`CrmServer`** ([app/Mcp/Servers/CrmServer.php](app/Mcp/Servers/CrmServer.php)) — an empty scaffold server (registered at `/mcp/crm`) kept around for experimenting with a second server/tool set.
+- **Weather MCP Console** ([resources/views/mcp-tester.blade.php](resources/views/mcp-tester.blade.php)) — a plain HTML/JS page served at `/` and `/mcp-tester` for connecting to the local Streamable HTTP MCP endpoint, discovering its tools, and calling `get-weather` interactively.
+- **MCP routes** ([routes/ai.php](routes/ai.php)) — registers the two servers with `Mcp::web(...)`.
 
-## Learning Laravel
+## Requirements
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- PHP ^8.1
+- Composer
+- Node.js + npm (for the console's Vite assets)
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Setup
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+composer install
+npm install
 
-## Laravel Sponsors
+cp .env.example .env
+php artisan key:generate
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+npm run dev      # or: npm run build
+php artisan serve
+```
 
-### Premium Partners
+No database is required to use the weather tool itself, but the default Laravel `.env` still points at one if you want to run migrations.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+## Trying it out
 
-## Contributing
+1. Start the app with `php artisan serve` and run `npm run dev` (or build assets) so the console's JS/CSS are available.
+2. Open `http://127.0.0.1:8000/` (or `/mcp-tester`) in a browser.
+3. Point **MCP endpoint** at `http://127.0.0.1:8000/mcp/weather` and click **Connect & discover** to list the server's tools.
+4. Call `get-weather` with a `location` (e.g. `Bengaluru`) and an optional `units` value to see a live structured response.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+You can also talk to the server directly as an MCP client (e.g. Claude Desktop, Claude Code, or another MCP-compatible client) by pointing it at the `/mcp/weather` Streamable HTTP endpoint.
 
-## Code of Conduct
+## Tests
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan test
+```
 
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+[tests/Feature/GetWeatherToolTest.php](tests/Feature/GetWeatherToolTest.php) fakes the Open-Meteo HTTP calls and asserts the tool returns correctly structured weather data.
 
 ## License
 
